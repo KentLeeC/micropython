@@ -135,6 +135,7 @@ static const DMA_InitTypeDef dma_init_struct_spi_i2c = {
 #if MICROPY_PY_MACHINE_I2S
 // Default parameters to dma_init() for i2s; Channel and Direction
 // vary depending on the peripheral instance so they get passed separately
+#if !defined(STM32H7A3xx) && !defined(STM32H7A3xxQ)
 static const DMA_InitTypeDef dma_init_struct_i2s = {
     #if defined(STM32F4) || defined(STM32F7)
     .Channel = 0,
@@ -155,6 +156,7 @@ static const DMA_InitTypeDef dma_init_struct_i2s = {
     .PeriphBurst = DMA_PBURST_SINGLE
     #endif
 };
+#endif
 #endif
 
 #if ENABLE_SDIO && !defined(STM32H5) && !defined(STM32H7) && !defined(STM32N6)
