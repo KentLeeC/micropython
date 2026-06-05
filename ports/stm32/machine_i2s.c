@@ -108,7 +108,9 @@ static const int8_t i2s_frame_map[NUM_I2S_USER_FORMATS][I2S_RX_FRAME_SIZE_IN_BYT
     { 2,  3,  0,  1,  6,  7,  4,  5 },  // Stereo, 32-bits
 };
 
+#if !defined(STM32H7A3xx) && !defined(STM32H7A3xxQ)
 static const plli2s_config_t plli2s_config[] = PLLI2S_TABLE;
+#endif
 
 void machine_i2s_init0() {
     for (uint8_t i = 0; i < MICROPY_HW_MAX_I2S; i++) {
@@ -117,14 +119,15 @@ void machine_i2s_init0() {
 }
 
 static bool lookup_plli2s_config(int8_t bits, int32_t rate, uint16_t *plli2sn, uint16_t *plli2sr) {
+    #if !defined(STM32H7A3xx) && !defined(STM32H7A3xxQ)
     for (uint16_t i = 0; i < MP_ARRAY_SIZE(plli2s_config); i++) {
-        if ((plli2s_config[i].bits == bits) && (plli2s_config[i].rate == rate)) {
+        if (plli2s_config[i].rate == rate) {
             *plli2sn = plli2s_config[i].plli2sn;
             *plli2sr = plli2s_config[i].plli2sr;
             return true;
         }
     }
-
+    #endif
     return false;
 }
 
@@ -176,7 +179,7 @@ static int8_t get_frame_mapping_index(int8_t bits, format_t format) {
     }
 }
 
-static int8_t get_dma_bits(uint16_t mode, int8_t bits) {
+static int32_t get_dma_bits(uint16_t mode, int8_t bits) {
     if (mode == I2S_MODE_MASTER_TX) {
         if (bits == 16) {
             return I2S_DATAFORMAT_16B;
@@ -320,7 +323,11 @@ static bool i2s_init(machine_i2s_obj_t *self) {
 
     // configure I2S PLL
     RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
-    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_I2S;
+    #if defined(STM32H7A3xx) || defined(STM32H7A3xxQ)
+        PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SPI123;
+    #else
+        PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_I2S;
+    #endif
 
     // lookup optimal PLL multiplier (PLLI2SN) and divisor (PLLI2SR) for a given sample size and sampling frequency
     uint16_t plli2sn;
@@ -328,13 +335,23 @@ static bool i2s_init(machine_i2s_obj_t *self) {
 
     if (lookup_plli2s_config(self->mode == I2S_MODE_MASTER_RX ? 32 : self->bits, self->rate, &plli2sn, &plli2sr)) {
         // match found
-        PeriphClkInitStruct.PLLI2S.PLLI2SN = plli2sn;
-        PeriphClkInitStruct.PLLI2S.PLLI2SR = plli2sr;
+        #if defined(STM32H7A3xx) || defined(STM32H7A3xxQ)
+            PeriphClkInitStruct.PLL2.PLL2N = plli2sn;
+            PeriphClkInitStruct.PLL2.PLL2R = plli2sr;
+        #else
+            PeriphClkInitStruct.PLLI2S.PLLI2SN = plli2sn;
+            PeriphClkInitStruct.PLLI2S.PLLI2SR = plli2sr;
+        #endif
     } else {
         // no match for sample size and rate
         // configure PLL to use power-on default values when a non-standard sampling frequency is used
-        PeriphClkInitStruct.PLLI2S.PLLI2SN = 192;
-        PeriphClkInitStruct.PLLI2S.PLLI2SR = 2;
+        #if defined(STM32H7A3xx) || defined(STM32H7A3xxQ)
+            PeriphClkInitStruct.PLL2.PLL2N = 192;
+            PeriphClkInitStruct.PLL2.PLL2R = 2;
+        #else
+            PeriphClkInitStruct.PLLI2S.PLLI2SN = 192;
+            PeriphClkInitStruct.PLLI2S.PLLI2SR = 2;
+        #endif
     }
 
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK) {
@@ -530,7 +547,9 @@ static void mp_machine_i2s_init_helper(machine_i2s_obj_t *self, mp_arg_val_t *ar
     init->MCLKOutput = I2S_MCLKOUTPUT_DISABLE;
     init->AudioFreq = args[ARG_rate].u_int;
     init->CPOL = I2S_CPOL_LOW;
-    init->ClockSource = I2S_CLOCK_PLL;
+    #if !defined(STM32H7A3xx) && !defined(STM32H7A3xxQ)
+        init->ClockSource = I2S_CLOCK_PLL;
+    #endif
     #if defined(STM32F4)
     init->FullDuplexMode = I2S_FULLDUPLEXMODE_DISABLE;
     #endif
