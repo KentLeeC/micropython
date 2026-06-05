@@ -27,7 +27,6 @@ jobs:
           - stm32_pyb_build
           - stm32_nucleo_build
           - stm32_misc_build
-          # 👉 密技：直接在矩陣裡加一格我們專屬的 Job 名字！
           - my_custom_h7a3_build
 
     runs-on: ubuntu-22.04
@@ -37,13 +36,8 @@ jobs:
           submodules: 'recursive'
 
       - name: Install packages
-        # 如果是我們自己的 Job，我們借用 stm32_nucleo_build 的環境設定來裝 ARM 工具鏈
         run: |
-          if [ "${{ matrix.ci_func }}" = "my_custom_h7a3_build" ]; then
-            tools/ci.sh stm32_setup && tools/ci.sh stm32_path >> $GITHUB_PATH
-          else
-            tools/ci.sh stm32_setup && tools/ci.sh stm32_path >> $GITHUB_PATH
-          fi
+          tools/ci.sh stm32_setup && tools/ci.sh stm32_path >> $GITHUB_PATH
 
       - name: Patch machine_i2s.c for STM32H7A3 HAL compatibility
         if: matrix.ci_func == 'my_custom_h7a3_build'
@@ -56,12 +50,21 @@ jobs:
               s = f.read()
           original = s
 
-          # Fix 1: Guard PLLI2S_TABLE — H7A3 has no PLLI2S peripheral
+          # Fix 1: guard plli2s_config array — H7A3 has no PLLI2S peripheral
           s = s.replace(
               'static const plli2s_config_t plli2s_config[] = PLLI2S_TABLE;',
               '#if !defined(STM32H7A3xx) && !defined(STM32H7A3xxQ)\n'
               'static const plli2s_config_t plli2s_config[] = PLLI2S_TABLE;\n'
               '#endif'
+          )
+
+          # Fix 1b: guard for-loop inside lookup_plli2s_config that uses
+          # plli2s_config[]. Function still exists on H7A3 but returns false.
+          s = re.sub(
+              r'(    for \(uint16_t i = 0; i < MP_ARRAY_SIZE\(plli2s_config\).*?return false;\n)',
+              r'#if !defined(STM32H7A3xx) && !defined(STM32H7A3xxQ)\n\1#endif\n',
+              s,
+              flags=re.DOTALL
           )
 
           # Fix 2: get_dma_bits return type int8_t overflows with H7A3
@@ -79,7 +82,7 @@ jobs:
               s
           )
 
-          # Fix 4: .PLLI2S.PLLI2SN → .PLL2.PLL2N  (variable form)
+          # Fix 4: .PLLI2S → .PLL2 (variable form)
           s = re.sub(
               r'([ \t]*)PeriphClkInitStruct\.PLLI2S\.PLLI2SN\s*=\s*(plli2sn)\s*;\n'
               r'([ \t]*)PeriphClkInitStruct\.PLLI2S\.PLLI2SR\s*=\s*(plli2sr)\s*;',
@@ -93,7 +96,7 @@ jobs:
               s
           )
 
-          # Fix 5: .PLLI2S.PLLI2SN → .PLL2.PLL2N  (hardcoded 192/2 form)
+          # Fix 5: .PLLI2S → .PLL2 (hardcoded 192/2 fallback)
           s = re.sub(
               r'([ \t]*)PeriphClkInitStruct\.PLLI2S\.PLLI2SN\s*=\s*192\s*;\n'
               r'([ \t]*)PeriphClkInitStruct\.PLLI2S\.PLLI2SR\s*=\s*2\s*;',
@@ -128,9 +131,8 @@ jobs:
       - name: Build Firmware
         run: |
           if [ "${{ matrix.ci_func }}" = "my_custom_h7a3_build" ]; then
-
-            # Fix 0: mpconfigboard_common.h unconditionally defines I2S=0,
-            # but NUCLEO_H7A3ZI_Q/mpconfigboard.h already defines it as 1.
+            # Fix 0: guard MICROPY_PY_MACHINE_I2S in mpconfigboard_common.h
+            # NUCLEO_H7A3ZI_Q already defines it as 1; common.h redefines as 0.
             sed -i \
               's/#define MICROPY_PY_MACHINE_I2S (0)/#ifndef MICROPY_PY_MACHINE_I2S\n#define MICROPY_PY_MACHINE_I2S (0)\n#endif/' \
               ports/stm32/mpconfigboard_common.h
@@ -150,3 +152,5 @@ jobs:
           name: my-stm32h7a3-firmware
           path: |
             ports/stm32/build-NUCLEO_H7A3ZI_Q/firmware.*
+
+            
