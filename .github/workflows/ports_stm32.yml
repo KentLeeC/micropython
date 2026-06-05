@@ -32,6 +32,11 @@ jobs:
     - uses: actions/checkout@v6
     - name: Install packages
       run: tools/ci.sh stm32_setup && tools/ci.sh stm32_path >> $GITHUB_PATH
-    - name: Build ci_${{matrix.ci_func }}
+    - name: Build ci_${{ matrix.ci_func }}
       run: tools/ci.sh ${{ matrix.ci_func }}
+    - name: Force Upload My STM32H7A3 Firmware
+      uses: actions/upload-artifact@v4
+      with:
+        name: my-stm32h7a3-firmware
+        path: ports/stm32/build-NUCLEO_H7A3ZI_Q/firmware.*
 
