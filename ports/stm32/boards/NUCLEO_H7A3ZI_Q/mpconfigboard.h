@@ -113,10 +113,6 @@
 #define MICROPY_HW_CAN1_TX                  (pin_D1)
 #define MICROPY_HW_CAN1_RX                  (pin_D0)
 
-// 強制開啟 machine.I2S 模組
-#ifdef MICROPY_PY_MACHINE_I2S
-#undef MICROPY_PY_MACHINE_I2S
-#endif
-#define MICROPY_PY_MACHINE_I2S (1)
+#define MICROPY_HW_I2S2 (SPI2) 
 
 void NUCLEO_H7A3ZIQ_board_early_init(void);
