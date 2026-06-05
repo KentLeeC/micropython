@@ -38,5 +38,9 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: my-stm32h7a3-firmware
-        path: ports/stm32/build-NUCLEO_H7A3ZI_Q/firmware.*
+        path: |
+            ports/stm32/**/firmware.*
+            ports/stm32/**/*.bin
+            ports/stm32/**/*.hex
+            ports/stm32/**/*.dfu
 
