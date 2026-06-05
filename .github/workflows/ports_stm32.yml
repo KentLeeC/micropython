@@ -38,109 +38,13 @@ jobs:
       - name: Install packages
         run: |
           tools/ci.sh stm32_setup && tools/ci.sh stm32_path >> $GITHUB_PATH
-
-      - name: Patch machine_i2s.c for STM32H7A3 HAL compatibility
-        if: matrix.ci_func == 'my_custom_h7a3_build'
-        run: |
-          python3 << 'PYEOF'
-          import re, sys
-
-          path = 'ports/stm32/machine_i2s.c'
-          with open(path) as f:
-              s = f.read()
-          original = s
-
-          # Fix 1: guard plli2s_config array — H7A3 has no PLLI2S peripheral
-          s = s.replace(
-              'static const plli2s_config_t plli2s_config[] = PLLI2S_TABLE;',
-              '#if !defined(STM32H7A3xx) && !defined(STM32H7A3xxQ)\n'
-              'static const plli2s_config_t plli2s_config[] = PLLI2S_TABLE;\n'
-              '#endif'
-          )
-
-          # Fix 1b: guard for-loop inside lookup_plli2s_config that uses
-          # plli2s_config[]. Function still exists on H7A3 but returns false.
-          s = re.sub(
-              r'(    for \(uint16_t i = 0; i < MP_ARRAY_SIZE\(plli2s_config\).*?return false;\n)',
-              r'#if !defined(STM32H7A3xx) && !defined(STM32H7A3xxQ)\n\1#endif\n',
-              s,
-              flags=re.DOTALL
-          )
-
-          # Fix 2: get_dma_bits return type int8_t overflows with H7A3
-          # I2S_DATAFORMAT_32B = SPI_I2SCFGR_DATLEN_1 = 512, exceeds int8_t
-          s = re.sub(r'\bint8_t(\s+get_dma_bits\b)', r'int32_t\1', s)
-
-          # Fix 3: RCC_PERIPHCLK_I2S → RCC_PERIPHCLK_SPI123 for H7A3
-          s = re.sub(
-              r'([ \t]*)PeriphClkInitStruct\.PeriphClockSelection\s*=\s*RCC_PERIPHCLK_I2S\s*;',
-              r'#if defined(STM32H7A3xx) || defined(STM32H7A3xxQ)\n'
-              r'\1PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SPI123;\n'
-              r'#else\n'
-              r'\1PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_I2S;\n'
-              r'#endif',
-              s
-          )
-
-          # Fix 4: .PLLI2S → .PLL2 (variable form)
-          s = re.sub(
-              r'([ \t]*)PeriphClkInitStruct\.PLLI2S\.PLLI2SN\s*=\s*(plli2sn)\s*;\n'
-              r'([ \t]*)PeriphClkInitStruct\.PLLI2S\.PLLI2SR\s*=\s*(plli2sr)\s*;',
-              r'#if defined(STM32H7A3xx) || defined(STM32H7A3xxQ)\n'
-              r'\1PeriphClkInitStruct.PLL2.PLL2N = \2;\n'
-              r'\3PeriphClkInitStruct.PLL2.PLL2R = \4;\n'
-              r'#else\n'
-              r'\1PeriphClkInitStruct.PLLI2S.PLLI2SN = \2;\n'
-              r'\3PeriphClkInitStruct.PLLI2S.PLLI2SR = \4;\n'
-              r'#endif',
-              s
-          )
-
-          # Fix 5: .PLLI2S → .PLL2 (hardcoded 192/2 fallback)
-          s = re.sub(
-              r'([ \t]*)PeriphClkInitStruct\.PLLI2S\.PLLI2SN\s*=\s*192\s*;\n'
-              r'([ \t]*)PeriphClkInitStruct\.PLLI2S\.PLLI2SR\s*=\s*2\s*;',
-              r'#if defined(STM32H7A3xx) || defined(STM32H7A3xxQ)\n'
-              r'\1PeriphClkInitStruct.PLL2.PLL2N = 192;\n'
-              r'\2PeriphClkInitStruct.PLL2.PLL2R = 2;\n'
-              r'#else\n'
-              r'\1PeriphClkInitStruct.PLLI2S.PLLI2SN = 192;\n'
-              r'\2PeriphClkInitStruct.PLLI2S.PLLI2SR = 2;\n'
-              r'#endif',
-              s
-          )
-
-          # Fix 6: ClockSource member doesn't exist in H7A3 I2S_InitTypeDef
-          s = re.sub(
-              r'([ \t]*)init->ClockSource\s*=\s*I2S_CLOCK_PLL\s*;',
-              r'#if !defined(STM32H7A3xx) && !defined(STM32H7A3xxQ)\n'
-              r'\1init->ClockSource = I2S_CLOCK_PLL;\n'
-              r'#endif',
-              s
-          )
-
-          if s == original:
-              print('WARNING: no replacements made — check source line format')
-              sys.exit(1)
-
-          with open(path, 'w') as f:
-              f.write(s)
-          print('Patch applied OK')
-          PYEOF
-
+      
       - name: Build Firmware
         run: |
           if [ "${{ matrix.ci_func }}" = "my_custom_h7a3_build" ]; then
-            # Fix 0: guard MICROPY_PY_MACHINE_I2S in mpconfigboard_common.h
-            # NUCLEO_H7A3ZI_Q already defines it as 1; common.h redefines as 0.
-            sed -i \
-              's/#define MICROPY_PY_MACHINE_I2S (0)/#ifndef MICROPY_PY_MACHINE_I2S\n#define MICROPY_PY_MACHINE_I2S (0)\n#endif/' \
-              ports/stm32/mpconfigboard_common.h
-
             make -C mpy-cross
             make -C ports/stm32 BOARD=NUCLEO_H7A3ZI_Q submodules
             make -j$(nproc) -C ports/stm32 BOARD=NUCLEO_H7A3ZI_Q
-
           else
             tools/ci.sh ${{ matrix.ci_func }}
           fi
