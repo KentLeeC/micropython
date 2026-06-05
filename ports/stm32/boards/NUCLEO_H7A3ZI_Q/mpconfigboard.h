@@ -113,6 +113,10 @@
 #define MICROPY_HW_CAN1_TX                  (pin_D1)
 #define MICROPY_HW_CAN1_RX                  (pin_D0)
 
-#define MICROPY_HW_I2S2 (SPI2) 
+#define MICROPY_HW_I2S2 (SPI2)
+
+#ifndef MICROPY_HW_I2S_NUM
+#define MICROPY_HW_I2S_NUM (2)
+#endif
 
 void NUCLEO_H7A3ZIQ_board_early_init(void);
