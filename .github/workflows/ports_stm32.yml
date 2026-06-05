@@ -30,19 +30,25 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive' # 強制抓取完整的 ST 晶片庫
+          
       - name: Install packages
         run: tools/ci.sh stm32_setup && tools/ci.sh stm32_path >> $GITHUB_PATH
-      - name: Build with Official Script and My Custom Board
-        # continue-on-error 代表就算官方腳本最後卡住噴錯，也不要卡死，繼續往下走！
-        continue-on-error: true 
+
+      - name: Build My Custom H7A3 Board
         run: |
-          tools/ci.sh ${{ matrix.ci_func }}
-          if [ "${{ matrix.ci_func }}" = "stm32_nucleo_build" ]; then
-            make -C ports/stm32 BOARD=NUCLEO_H7A3ZI_Q
-          fi
+          # 1. 進入 mpy-cross 編譯 MicroPython 核心交叉編譯器
+          make -C mpy-cross
+          
+          # 2. 進入 stm32 目錄先抓取 submodules 地基
+          make -C ports/stm32 submodules
+          
+          # 3. 指定只編譯我們的 H7A3 晶片（不要跑官方可能內含清理機制的 ci.sh）
+          make -C ports/stm32 BOARD=NUCLEO_H7A3ZI_Q
+
       - name: Force Upload My STM32H7A3 Firmware
-        # uses: actions/upload-artifact@v4 必須在前面的步驟結束後執行
-        if: always() # 強迫這一步「無論如何（不管前面成功或失敗）」都必須執行！
+        if: always() # 強制無論如何都要撈檔案
         uses: actions/upload-artifact@v4
         with:
           name: my-stm32h7a3-firmware-${{ matrix.ci_func }}
