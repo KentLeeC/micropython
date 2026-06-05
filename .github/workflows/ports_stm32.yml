@@ -48,12 +48,17 @@ jobs:
       - name: Build Firmware
         run: |
           if [ "${{ matrix.ci_func }}" = "my_custom_h7a3_build" ]; then
-            # 如果是我們專屬的通道，老老實實跑完打底並編譯 H7A3
+            # Fix: mpconfigboard_common.h unconditionally defines I2S=0,
+            # but NUCLEO_H7A3ZI_Q/mpconfigboard.h already sets it to 1.
+            # Wrap with #ifndef to let board config win.
+            sed -i \
+              's/#define MICROPY_PY_MACHINE_I2S (0)/#ifndef MICROPY_PY_MACHINE_I2S\n#define MICROPY_PY_MACHINE_I2S (0)\n#endif/' \
+              ports/stm32/mpconfigboard_common.h
+
             make -C mpy-cross
-            make -C ports/stm32 submodules
-            make -C ports/stm32 BOARD=NUCLEO_H7A3ZI_Q
+            make -C ports/stm32 BOARD=NUCLEO_H7A3ZI_Q submodules
+            make -j$(nproc) -C ports/stm32 BOARD=NUCLEO_H7A3ZI_Q
           else
-            # 其他官方原本的 Job，照原樣執行不打擾
             tools/ci.sh ${{ matrix.ci_func }}
           fi
 
