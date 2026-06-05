@@ -2,7 +2,7 @@ name: stm32 port
 
 on:
   push:
-  pull_request:  
+  pull_request:
     paths:
       - '.github/workflows/*.yml'
       - 'tools/**'
@@ -23,36 +23,44 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ci_func:  # names are functions in ci.sh
+        ci_func:
           - stm32_pyb_build
           - stm32_nucleo_build
           - stm32_misc_build
+          # 👉 密技：直接在矩陣裡加一格我們專屬的 Job 名字！
+          - my_custom_h7a3_build
+
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: 'recursive' # 強制抓取完整的 ST 晶片庫
-          
-      - name: Install packages
-        run: tools/ci.sh stm32_setup && tools/ci.sh stm32_path >> $GITHUB_PATH
+          submodules: 'recursive'
 
-      - name: Build My Custom H7A3 Board
+      - name: Install packages
+        # 如果是我們自己的 Job，我們借用 stm32_nucleo_build 的環境設定來裝 ARM 工具鏈
         run: |
-          # 1. 進入 mpy-cross 編譯 MicroPython 核心交叉編譯器
-          make -C mpy-cross
-          
-          # 2. 進入 stm32 目錄先抓取 submodules 地基
-          make -C ports/stm32 submodules
-          
-          # 3. 指定只編譯我們的 H7A3 晶片（不要跑官方可能內含清理機制的 ci.sh）
-          make -C ports/stm32 BOARD=NUCLEO_H7A3ZI_Q
+          if [ "${{ matrix.ci_func }}" = "my_custom_h7a3_build" ]; then
+            tools/ci.sh stm32_setup && tools/ci.sh stm32_path >> $GITHUB_PATH
+          else
+            tools/ci.sh stm32_setup && tools/ci.sh stm32_path >> $GITHUB_PATH
+          fi
+
+      - name: Build Firmware
+        run: |
+          if [ "${{ matrix.ci_func }}" = "my_custom_h7a3_build" ]; then
+            # 如果是我們專屬的通道，老老實實跑完打底並編譯 H7A3
+            make -C mpy-cross
+            make -C ports/stm32 submodules
+            make -C ports/stm32 BOARD=NUCLEO_H7A3ZI_Q
+          else
+            # 其他官方原本的 Job，照原樣執行不打擾
+            tools/ci.sh ${{ matrix.ci_func }}
+          fi
 
       - name: Force Upload My STM32H7A3 Firmware
-        if: always() # 強制無論如何都要撈檔案
+        if: matrix.ci_func == 'my_custom_h7a3_build'
         uses: actions/upload-artifact@v4
         with:
-          name: my-stm32h7a3-firmware-${{ matrix.ci_func }}
+          name: my-stm32h7a3-firmware
           path: |
             ports/stm32/build-NUCLEO_H7A3ZI_Q/firmware.*
-
-            
