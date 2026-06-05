@@ -266,13 +266,17 @@ const dma_descr_t dma_DAC_1_TX = { DMA1_Channel3, HAL_DMA1_CH3_DAC_CH1, dma_id_2
 const dma_descr_t dma_DAC_2_TX = { DMA1_Channel4, HAL_DMA1_CH4_DAC_CH2, dma_id_3, &dma_init_struct_dac };
 #endif
 const dma_descr_t dma_SPI_2_TX = { DMA1_Channel5, HAL_DMA1_CH5_SPI2_TX, dma_id_4, &dma_init_struct_spi_i2c};
-#if MICROPY_PY_MACHINE_I2S
-const dma_descr_t dma_I2S_2_RX = { DMA1_Stream3, DMA_REQUEST_SPI2_RX, dma_id_3,  &dma_init_struct_i2s };
-const dma_descr_t dma_I2S_2_TX = { DMA1_Stream4, DMA_REQUEST_SPI2_TX, dma_id_4,  &dma_init_struct_i2s };
-#endif
 const dma_descr_t dma_SPI_2_RX = { DMA1_Channel6, HAL_DMA1_CH6_SPI2_RX, dma_id_5, &dma_init_struct_spi_i2c};
 const dma_descr_t dma_SPI_1_RX = { DMA2_Channel3, HAL_DMA2_CH3_SPI1_RX, dma_id_9, &dma_init_struct_spi_i2c};
 const dma_descr_t dma_SPI_1_TX = { DMA2_Channel4, HAL_DMA2_CH4_SPI1_TX, dma_id_10, &dma_init_struct_spi_i2c};
+
+// 在它後面加：
+#if MICROPY_PY_MACHINE_I2S
+const dma_descr_t dma_I2S_2_RX = { DMA1_Stream3, DMA_REQUEST_SPI2_RX, dma_id_3,  &dma_init_struct_i2s };
+const dma_descr_t dma_I2S_2_TX = { DMA1_Stream4, DMA_REQUEST_SPI2_TX, dma_id_4,  &dma_init_struct_i2s };
+const dma_descr_t dma_I2S_1_RX = { DMA2_Stream2, DMA_REQUEST_SPI1_RX, dma_id_10, &dma_init_struct_i2s };
+const dma_descr_t dma_I2S_1_TX = { DMA2_Stream5, DMA_REQUEST_SPI1_TX, dma_id_13, &dma_init_struct_i2s };
+#endif
 
 static const uint8_t dma_irqn[NSTREAM] = {
     DMA1_Ch1_IRQn,
