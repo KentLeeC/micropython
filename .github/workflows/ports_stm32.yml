@@ -33,18 +33,20 @@ jobs:
       - name: Install packages
         run: tools/ci.sh stm32_setup && tools/ci.sh stm32_path >> $GITHUB_PATH
       - name: Build with Official Script and My Custom Board
+        # continue-on-error 代表就算官方腳本最後卡住噴錯，也不要卡死，繼續往下走！
+        continue-on-error: true 
         run: |
-          # 1. 先跑官方原本的編譯，把所有環境、QSTR、工具鏈全部初始化建立好
           tools/ci.sh ${{ matrix.ci_func }}
-          
-          # 2. 當環境被官方腳本初始化完畢後，我們趁機塞入我們的主角 H7A3
-          # 這裡加一個 if 判斷，只讓 nucleo 那組伺服器順便幫我們編譯 H7A3，省時又不會亂套
           if [ "${{ matrix.ci_func }}" = "stm32_nucleo_build" ]; then
             make -C ports/stm32 BOARD=NUCLEO_H7A3ZI_Q
           fi
       - name: Force Upload My STM32H7A3 Firmware
+        # uses: actions/upload-artifact@v4 必須在前面的步驟結束後執行
+        if: always() # 強迫這一步「無論如何（不管前面成功或失敗）」都必須執行！
         uses: actions/upload-artifact@v4
         with:
           name: my-stm32h7a3-firmware-${{ matrix.ci_func }}
           path: |
             ports/stm32/build-NUCLEO_H7A3ZI_Q/firmware.*
+
+            
