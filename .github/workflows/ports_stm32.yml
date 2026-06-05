@@ -29,18 +29,19 @@ jobs:
           - stm32_misc_build
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v6
-    - name: Install packages
-      run: tools/ci.sh stm32_setup && tools/ci.sh stm32_path >> $GITHUB_PATH
-    - name: Build ci_${{ matrix.ci_func }}
-      run: tools/ci.sh ${{ matrix.ci_func }}
-    - name: Force Upload My STM32H7A3 Firmware
-      uses: actions/upload-artifact@v4
-      with:
-        name: my-stm32h7a3-firmware
-        path: |
-            ports/stm32/**/firmware.*
-            ports/stm32/**/*.bin
-            ports/stm32/**/*.hex
-            ports/stm32/**/*.dfu
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - name: Install packages
+        run: tools/ci.sh stm32_setup && tools/ci.sh stm32_path >> $GITHUB_PATH
+      - name: Build My Custom H7A3 Board
+        run: |
+          make -C mpy-cross
+          make -C ports/stm32 BOARD=NUCLEO_H7A3ZI_Q
+      - name: Force Upload My STM32H7A3 Firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: my-stm32h7a3-firmware
+          path: |
+            ports/stm32/build-NUCLEO_H7A3ZI_Q/firmware.*
 
