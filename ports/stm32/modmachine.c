@@ -49,6 +49,12 @@
 #include "spi.h"
 #include "shared/tinyusb/mp_usbd.h"
 
+// --- temporary debug check ---
+#if !MICROPY_PY_MACHINE_I2S
+#error "MICROPY_PY_MACHINE_I2S is 0 here"
+#endif
+// --- end debug check ---
+
 #if defined(STM32G0)
 // G0 has BOR and POR combined
 #define RCC_CSR_BORRSTF RCC_CSR_PWRRSTF
